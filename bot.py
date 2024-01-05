@@ -14,12 +14,15 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 QueuesDict = {}             # Dictionary of queue_name string -> Queue() object
 UsersInAllQueues = []       # List of user.id's
 
+est = pytz.timezone('US/Eastern')
+
+
 class Queue:
     def __init__(self, partyLeader, eventTime):
         self.queue = []                     # List of user.id's (Current queue)
-        self.fill = []                      # List of user.id's (Fill queue)
         self.partyLeader = partyLeader;     # user.id
         self.eventTime = eventTime          # event time
+        self.notified = False               # notification boolean
     
     def __del__(self):
         print(f'deleted')
@@ -27,17 +30,16 @@ class Queue:
     def display(self, bot):
         usernames = [bot.get_user(user_id).name for user_id in self.queue]
         return usernames
-        
+
     async def send_notification(self, bot, ctx, queue_name):
-        est = pytz.timezone('US/Eastern')
-        eventTime_est = self.eventTime.astimezone(est)
-        time_difference = eventTime_est - datetime.now(est)
-        time_difference_in_seconds = time_difference.total_seconds()
-        print(f'time_difference_in_seconds: {time_difference_in_seconds}')
-        await asyncio.sleep(time_difference_in_seconds)
-        queue_obj = QueuesDict[queue_name]
-        party_list = '\n'.join([f'{idx + 1}. <@{user}>' for idx, user in enumerate(queue_obj.queue)])
-        await ctx.send(f'Queue time has been reached. \nEvent Time: **{QueuesDict[queue_name].eventTime}** \nParty Members in **{queue_name}**:\n{party_list}')
+        while datetime.now(est) < self.eventTime and not self.notified:
+            await asyncio.sleep(1)  # Check every second
+        
+        if not self.notified:
+            queue_obj = QueuesDict[queue_name]
+            party_list = '\n'.join([f'{idx + 1}. <@{user}>' for idx, user in enumerate(queue_obj.queue)])
+            await ctx.send(f'Queue time has been reached. \nEvent Time: **{QueuesDict[queue_name].eventTime}** \nParty Members in **{queue_name}**:\n{party_list}')
+            self.notified = True  # Set the flag to avoid duplicate notifications
 
 @bot.event
 async def on_ready():
